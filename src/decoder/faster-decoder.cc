@@ -222,34 +222,36 @@ void FasterDecoder::PossiblyResizeHash(size_t num_toks) {
 
 // ProcessEmitting returns the likelihood cutoff used.
 double FasterDecoder::ProcessEmitting(DecodableInterface *decodable) {
-  int32 frame = num_frames_decoded_;
-  Elem *last_toks = toks_.Clear();
+  int32 frame = num_frames_decoded_;//当前帧
+  Elem *last_toks = toks_.Clear();//清空当前HashTable，放回当前保存的List的头
   size_t tok_cnt;
   BaseFloat adaptive_beam;
   Elem *best_elem = NULL;
   double weight_cutoff = GetCutoff(last_toks, &tok_cnt,
-                                   &adaptive_beam, &best_elem);
+                                   &adaptive_beam, &best_elem);//当前截断权重，对当前帧下的tok_cnt，adaptive_beam,best_elem 进行赋值
   KALDI_VLOG(3) << tok_cnt << " tokens active.";
   PossiblyResizeHash(tok_cnt);  // This makes sure the hash is always big enough.
     
   // This is the cutoff we use after adding in the log-likes (i.e.
   // for the next frame).  This is a bound on the cutoff we will use
   // on the next frame.
-  double next_weight_cutoff = std::numeric_limits<double>::infinity();
+  double next_weight_cutoff = std::numeric_limits<double>::infinity();//保存下一帧的预测的最佳权重
   
   // First process the best token to get a hopefully
   // reasonably tight bound on the next cutoff.
+  //利用best token求解下一帧截断权重的紧边界
   if (best_elem) {
     StateId state = best_elem->key;
-    Token *tok = best_elem->val;
+    Token *tok = best_elem->val;//得到最佳token及其末态
+    //对末态的arc进行迭代
     for (fst::ArcIterator<fst::Fst<Arc> > aiter(fst_, state);
          !aiter.Done();
          aiter.Next()) {
-      const Arc &arc = aiter.Value();
+      const Arc &arc = aiter.Value();//当前遍历的弧
       if (arc.ilabel != 0) {  // we'd propagate..
-        BaseFloat ac_cost = - decodable->LogLikelihood(frame, arc.ilabel);
-        double new_weight = arc.weight.Value() + tok->cost_ + ac_cost;
-        if (new_weight + adaptive_beam < next_weight_cutoff)
+        BaseFloat ac_cost = - decodable->LogLikelihood(frame, arc.ilabel);//当前帧与当前弧输入label的log-likelihood
+        double new_weight = arc.weight.Value() + tok->cost_ + ac_cost;//当前弧给出的next_weight_cutoff
+        if (new_weight + adaptive_beam < next_weight_cutoff)//更新next_weight_cutoff
           next_weight_cutoff = new_weight + adaptive_beam;
       }
     }
@@ -260,29 +262,33 @@ double FasterDecoder::ProcessEmitting(DecodableInterface *decodable) {
   // the tokens are now owned here, in last_toks, and the hash is empty.
   // 'owned' is a complex thing here; the point is we need to call TokenDelete
   // on each elem 'e' to let toks_ know we're done with them.
+  //last_toks当前list的头
   for (Elem *e = last_toks, *e_tail; e != NULL; e = e_tail) {  // loop this way
     // n++;
     // because we delete "e" as we go.
-    StateId state = e->key;
-    Token *tok = e->val;
+    StateId state = e->key;//e的下一个状态
+    Token *tok = e->val;//e的token的指针
+    //当当前token的花费小于当前的权重截断时，保留枝
     if (tok->cost_ < weight_cutoff) {  // not pruned.
       // np++;
       KALDI_ASSERT(state == tok->arc_.nextstate);
+      //遍历当前token末态的所有arc
       for (fst::ArcIterator<fst::Fst<Arc> > aiter(fst_, state);
            !aiter.Done();
            aiter.Next()) {
         Arc arc = aiter.Value();
         if (arc.ilabel != 0) {  // propagate..
-          BaseFloat ac_cost =  - decodable->LogLikelihood(frame, arc.ilabel);
-          double new_weight = arc.weight.Value() + tok->cost_ + ac_cost;
-          if (new_weight < next_weight_cutoff) {  // not pruned..
-            Token *new_tok = new Token(arc, ac_cost, tok);
-            Elem *e_found = toks_.Find(arc.nextstate);
-            if (new_weight + adaptive_beam < next_weight_cutoff)
+          BaseFloat ac_cost =  - decodable->LogLikelihood(frame, arc.ilabel);//当前arc的输入label，在当前帧下的Log_likelihood
+          double new_weight = arc.weight.Value() + tok->cost_ + ac_cost;//当前arc对于的可能token的花费
+          if (new_weight < next_weight_cutoff) {  // not pruned..当当前arc对应的token的可能花费小于next_weight_cutoff时，保留arc，生成token
+            Token *new_tok = new Token(arc, ac_cost, tok);//生成新的token
+            Elem *e_found = toks_.Find(arc.nextstate);//在Hash_list，toks_中寻找是否存在arc.nextstate状态
+            if (new_weight + adaptive_beam < next_weight_cutoff) //如果此时的权重小于next_weight_cutoff，更新next_weight_cutoff
               next_weight_cutoff = new_weight + adaptive_beam;
+            //如果不存在这个状态，将这个末态，与对应的token生成，key-val对插入Hashlist
             if (e_found == NULL) {
               toks_.Insert(arc.nextstate, new_tok);
-            } else {
+            } else {//如果存在这个状态，那么比较Hashlist中这个状态的token与new_token的权重，保留其中权重大的那一个。
               if ( *(e_found->val) < *new_tok ) {
                 Token::TokenDelete(e_found->val);
                 e_found->val = new_tok;
