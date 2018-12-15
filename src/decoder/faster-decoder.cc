@@ -289,7 +289,7 @@ double FasterDecoder::ProcessEmitting(DecodableInterface *decodable) {
             if (e_found == NULL) {
               toks_.Insert(arc.nextstate, new_tok);
             } else {//如果存在这个状态，那么比较Hashlist中这个状态的token与new_token的权重，保留其中权重大的那一个。
-              if ( *(e_found->val) < *new_tok ) {
+              if ( *(e_found->val) < *new_tok ) {//注意这<的定义实际上是大于
                 Token::TokenDelete(e_found->val);
                 e_found->val = new_tok;
               } else {
