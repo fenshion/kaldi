@@ -49,10 +49,10 @@ namespace kaldi {
 
 template<class I, class T> class HashList {
  public:
-  struct Elem {
+  struct Elem {//Elem可以构成一个List结构。
     I key;
     T val;
-    Elem *tail;
+    Elem *tail;//指向下一个Elem的位置
   };
 
   /// Constructor takes no arguments.
@@ -116,29 +116,32 @@ template<class I, class T> class HashList {
 
   ~HashList();
  private:
-
+  
+  //HashList中一个hash值对应的Hash块的结构
   struct HashBucket {
     size_t prev_bucket;  // index to next bucket (-1 if list tail).  Note:
     // list of buckets goes in opposite direction to list of Elems.
-    Elem *last_elem;  // pointer to last element in this bucket (NULL if empty)
+    // 下一个Hash块对应在buckets_中的位置，注意hash块顺序与Elem list顺序是相反的
+    Elem *last_elem;  // pointer to last element in this bucket (NULL if empty)，当前Hash块最后一个Elem的位置
     inline HashBucket(size_t i, Elem *e): prev_bucket(i), last_elem(e) {}
   };
 
-  Elem *list_head_;  // head of currently stored list.
-  size_t bucket_list_tail_;  // tail of list of active hash buckets.
+  Elem *list_head_;  // head of currently stored list.当前Elem list的头的位置
+  size_t bucket_list_tail_;  // tail of list of active hash buckets. buckets_中最后一个激活的hush块在vector（hash表）中的指标
 
-  size_t hash_size_;  // number of hash buckets.
+  size_t hash_size_;  // number of hash buckets. hash块的数目
 
-  std::vector<HashBucket> buckets_;
+  std::vector<HashBucket> buckets_; //hash块组成的hash表
 
   Elem *freed_head_;  // head of list of currently freed elements. [ready for
-  // allocation]
+  // allocation] 当前未利用的Elem的头的位置，对应于allocated_中最后一个元素指向的内存块的第一个未被使用的Elem的位置，如果全被使用，则为NULL
 
-  std::vector<Elem*> allocated_;  // list of allocated blocks.
+  std::vector<Elem*> allocated_;  // list of allocated blocks. 已分配的保存Elem的内存块位置，除了最后一个元素对于的内存块，
+   //其余内存块均已经被填满
 
   static const size_t allocate_block_size_ = 1024;  // Number of Elements to
   // allocate in one block.  Must be largish so storing allocated_ doesn't
-  // become a problem.
+  // become a problem. 单个内存块中可保存的Elem的数目
 };
 
 
