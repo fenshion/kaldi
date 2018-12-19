@@ -228,9 +228,9 @@ double FasterDecoder::ProcessEmitting(DecodableInterface *decodable) {
   BaseFloat adaptive_beam;
   Elem *best_elem = NULL;
   double weight_cutoff = GetCutoff(last_toks, &tok_cnt,
-                                   &adaptive_beam, &best_elem);//当前截断权重，对当前帧下的tok_cnt，adaptive_beam,best_elem 进行赋值
+                                   &adaptive_beam, &best_elem);//返回满足条件的当前截断权重，对当前帧下的tok_cnt，adaptive_beam,best_elem 进行赋值
   KALDI_VLOG(3) << tok_cnt << " tokens active.";
-  PossiblyResizeHash(tok_cnt);  // This makes sure the hash is always big enough.
+  PossiblyResizeHash(tok_cnt);  // This makes sure the hash is always big enough.确保Hash表够大
     
   // This is the cutoff we use after adding in the log-likes (i.e.
   // for the next frame).  This is a bound on the cutoff we will use
@@ -301,8 +301,8 @@ double FasterDecoder::ProcessEmitting(DecodableInterface *decodable) {
       }
     }
     e_tail = e->tail;
-    Token::TokenDelete(e->val);
-    toks_.Delete(e);
+    Token::TokenDelete(e->val);//对e->val对象指针使用对象的个数减1，如果为零则删除
+    toks_.Delete(e);//对这个指针置空方便下次使用。
   }
   num_frames_decoded_++;
   return next_weight_cutoff;
