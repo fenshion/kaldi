@@ -153,7 +153,7 @@ double FasterDecoder::GetCutoff(Elem *list_head, size_t *tok_count,
   double best_cost = std::numeric_limits<double>::infinity();
   size_t count = 0;
   if (config_.max_active == std::numeric_limits<int32>::max() &&
-      config_.min_active == 0) {
+      config_.min_active == 0) {//如果没有限制最大或最小激活数，那么截断权重为best_cost+adaptive_beam
     for (Elem *e = list_head; e != NULL; e = e->tail, count++) {
       double w = e->val->cost_;
       if (w < best_cost) {
@@ -164,7 +164,7 @@ double FasterDecoder::GetCutoff(Elem *list_head, size_t *tok_count,
     if (tok_count != NULL) *tok_count = count;
     if (adaptive_beam != NULL) *adaptive_beam = config_.beam;
     return best_cost + config_.beam;
-  } else {
+  } else {   //如果限制了最大最小激活数，那么根据best_cost+adaptive_beam，给出满足最大最小激活数的截断权重。
     tmp_array_.clear();
     for (Elem *e = list_head; e != NULL; e = e->tail, count++) {
       double w = e->val->cost_;
